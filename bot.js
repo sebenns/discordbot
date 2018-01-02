@@ -44,6 +44,10 @@ const Commands = {
     "COM_SHOW_RANK" : [{
         "command" : "rank",
         "description" : "Liste die Top 5 Nutzer mit dem meisten Gold auf."
+    }],
+    "COM_SPAWN_STOP" : [{
+        "command" : "spawnkill",
+        "description" : "Killt den Porospawner :(."
     }]
 };
 
@@ -56,12 +60,13 @@ const Channel = {
 // PoroGame SomeOsaVars
 let spawned = false;
 let rmNumb = "";
+let looper;
 
 const PoroGame = {
     "Settings" : [{
         "TimeOut": "60000", // 60 Seconds
-        "MaxIntVall": "600000", // 10 Minutes
-        "MinIntVall": "600000", // 10 Minutes
+        "MaxIntVall": "20000", // 10 Minutes
+        "MinIntVall": "10000", // 10 Minutes
     }],
     "Lang" : [{
         "cought" : "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für %s Gold an einen kuriosen muskolösen bärtigen Mann verkauft.",
@@ -167,24 +172,25 @@ class BotData {
     // Poro MiniGame
     spawnPoro(msg) {
         function outerFunction() {}
+        (function loop() {
             spawned = true;
             rmNumb = Math.floor(1000 + Math.random() * 9000); // 0000x4
             msg.channel.send(PoroGame.POROS[0].PORO[0].appear, {file: PoroGame.POROS[0].PORO[0].image})
-                .then(setTimeout(function(){msg.channel.send(vprintf(PoroGame.POROS[0].PORO[0].catch,[Commands.COM_CATCH[0].command,rmNumb]))
+                .then(setTimeout(function(){msg.channel.send(vsprintf(PoroGame.POROS[0].PORO[0].catch,[Commands.COM_CATCH[0].command,rmNumb]))
                     .then(msg => msg.delete(PoroGame.Settings[0].TimeOut))},300))
-                        .then(msg => msg.delete(PoroGame.Settings[0].TimeOut));
+                .then(msg => msg.delete(PoroGame.Settings[0].TimeOut));
             setTimeout(function() { spawned = false; }, PoroGame.Settings[0].TimeOut);
-        (function loop() {
-            let rand = Math.round(Math.random() * (PoroGame.Settings[0].MaxIntVall - PoroGame.Settings[0].MinIntVall)) + PoroGame.Settings[0].MinIntVall;
-            if(arg === "stop") { return false }
-            setTimeout(function() {
+            let rand = Math.random() * (PoroGame.Settings[0].MaxIntVall - PoroGame.Settings[0].MinIntVall) + PoroGame.Settings[0].MinIntVall;
+            looper = setTimeout(function() {
                 outerFunction();
                 loop();
             }, rand);
         }());
     }
+    spawnStop() {
+        clearTimeout(looper);
+    }
     catchPoro(msg, number) {
-        console.log(rmNumb);
         if((spawned) && (number == rmNumb)) {
             let gold = Math.floor((Math.random() * 30) + 40);
             msg.channel.send(vsprintf(PoroGame.Lang[0].cought, [msg.author,gold ])).then(msg => msg.delete(PoroGame.Settings[0].TimeOut));
@@ -269,7 +275,14 @@ client.on("message", (message) => {
 
                 case Commands.COM_SPAWN_PORO[0].command:
                     if(bot.checkValid(message, "onPermission")) {
-                        bot.spawnPoro(message);
+                        bot.spawnPoro(message, msgCmd[1]);
+                        message.delete().catch(console.error);
+                    }
+                    break;
+
+                case Commands.COM_SPAWN_STOP[0].command:
+                    if(bot.checkValid(message, "onPermission")) {
+                        bot.spawnStop();
                         message.delete().catch(console.error);
                     }
                     break;
