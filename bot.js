@@ -15,46 +15,62 @@ let connection = mysql.createConnection({
 const Commands = {
     "COM_HELP" : [{
         "command" : "help",
-        "description" : "Zeigt alle Commands an."
+        "description" : "Zeigt alle Commands an.",
+        "group" : "user"
         }],
     "COM_ADD_ROLE" : [{
         "command" : "addRole",
-        "description" : "Fügt Dir eine Gaming-Rolle hinzu."
+        "description" : "Fügt Dir eine Gaming-Rolle hinzu.",
+        "group" : "user",
     }],
     "COM_REMOVE_ROLE" : [{
         "command" : "removeRole",
-        "description" : "Nimmt Dir eine Gaming-Rolle weg."
+        "description" : "Nimmt Dir eine Gaming-Rolle weg.",
+        "group" : "user"
     }],
     "COM_CATCH" : [{
         "command" : "catch",
-        "description" : "Fange ein Poro ein!"
+        "description" : "Fange ein Poro ein!",
+        "group" : "user"
     }],
     "COM_SPAWN_PORO" : [{
         "command" : "spawn",
-        "description" : "Spawnt ein Poro."
+        "description" : "Spawnt ein Poro.",
+        "group" : "admin"
     }],
     "COM_SHOW_GOLD" : [{
         "command" : "gold",
-        "description" : "Zeige allen, wie viel Gold du besitzt!"
+        "description" : "Zeige allen, wie viel Gold du besitzt!",
+        "group" : "user"
+
     }],
     "COM_BUY_ITEM" : [{
         "command" : "buy",
-        "description" : "Kaufe Dir mit deinem Gold eine Rolle!"
+        "description" : "Kaufe Dir mit deinem Gold eine Rolle!",
+        "group" : "user"
     }],
     "COM_SHOW_RANK" : [{
         "command" : "rank",
-        "description" : "Liste die Top 5 Nutzer mit dem meisten Gold auf."
+        "description" : "Liste die Top 5 Nutzer mit dem meisten Gold auf.",
+        "group" : "user"
     }],
     "COM_SPAWN_STOP" : [{
         "command" : "spawnkill",
-        "description" : "Killt den Porospawner :(."
+        "description" : "Killt den Porospawner :(.",
+        "group" : "admin"
+    }],
+    "COM_SHOW_STORE" : [{
+        "command" : "store",
+        "description" : "Zeige alle kaufbaren Items an.",
+        "group" : "user"
     }]
 };
 
 const Channel = {
     "CH_DEVELOPMENT" : "397075001637077002",
     "CH_ROLE_ASSIGNMENT" : "397120155601207307",
-    "CH_LOBBY" : "397035772567617539"
+    "CH_LOBBY" : "397035772567617539",
+    "CH_SHOP" : "398033043878576130"
 };
 
 // PoroGame SomeOsaVars
@@ -64,21 +80,47 @@ let looper;
 
 const PoroGame = {
     "Settings" : [{
-        "TimeOut": "60000", // 60 Seconds
-        "MaxIntVall": "20000", // 10 Minutes
-        "MinIntVall": "10000", // 10 Minutes
+        "TimeOut": "30000", // 30 Seconds
+        "MaxIntVall": "1200000", // 20 Minutes
+        "MinIntVall": "600000", // 10 Minutes
     }],
     "Lang" : [{
         "cought" : "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für %s Gold an einen kuriosen muskolösen bärtigen Mann verkauft.",
         "bank_notEnough" : "Du hast zurzeit leider kein Gold. Du solltest Dir lieber etwas dazu verdienen! Nyo nyo nya nyo.",
-        "bank_status" : "Du hast zurzeit `%s Gold`. Wenn Du nach neuen Accessoires suchst, versuche es mal im Poro-Shop! Nyo nya nya!"
+        "bank_status" : "Du hast zurzeit `%s Gold`. Wenn Du nach neuen Accessoires suchst, versuche es mal im Poro-Shop! Nyo nya nya!",
+        "buy_success" : "Dein gekauftes Item wurde Dir erfolgreich gutgeschrieben! Viel Spaß damit :) Non non nan nan!",
+        "buy_notExist" : "Das von dir ausgesuchte Item existiert leider garnicht! Hast du Dich etwa vertippt, nya nya nyo?",
+        "buy_notEnough" : "Du hast leider nicht genug Gold. Versuche es ein anderes Mal, du Gauner! NON NON NAN NON NANANAN NON"
     }],
     "POROS": [{
         "PORO": [{
             "appear" : "Ein wildes Poro ist erschienen!",
             "catch" : "Benutze `!%s %s` um das wilde Poro einzufangen!",
             "type" : "normal",
-            "image" : "https://i.pinimg.com/originals/18/7d/0f/187d0fd46e07644bbcc52d1d08e0fba4.jpg"
+            "image" : "http://riverflowsinyou.de/scr/187d0fd46e07644bbcc52d1d08e0fba4.png"
+        }]
+    }],
+    "STORE": [{
+        "ITEM_UNICORN": [{
+            "name" : "Unicorn-of-Love",
+            "item" : "Unicorn of Love",
+            "description" : "Ein Rang der nur vor Liebe strotzt. Are you the Unicorn of Love?",
+            "prize" : "5000",
+            "type" : "Rank"
+        }],
+        "ITEM_CAT" : [{
+            "name" : "Flying-Cat",
+            "item" : "Flying Cat",
+            "description" : "Flying Cats here, Flying Cats there, Flying Cats everywhere!",
+            "prize" : "2500",
+            "type" : "Rank"
+        }],
+        "ITEM_FOOD" : [{
+            "name" : "Katzenfutter",
+            "item" : "Katzenfutter",
+            "description" : "Hast Du dich schon immer mit Katzenfutter identifizieren können?",
+            "prize" : "500",
+            "type" : "Rank"
         }]
     }]
 };
@@ -123,11 +165,16 @@ class BotData {
         let stm = "```\n";
         for(let key in Commands) {
             if (Commands.hasOwnProperty(key)) {
-                stm += "!"+Commands[key][0].command+" ---> "+Commands[key][0].description+"\n";
+                if(Commands[key][0].group === "admin" && this.checkValid(msg, "onPermission")) {
+                    stm += "!" + Commands[key][0].command + " ---> " + Commands[key][0].description + "\n";
+                } else if (Commands[key][0].group === "user") {
+                    stm += "!" + Commands[key][0].command + " ---> " + Commands[key][0].description + "\n";
+                }
             }
         }
         stm += "```";
-        msg.channel.send(stm);
+        msg.author.send(stm);
+        msg.delete().catch(console.error);
     }
     // Assignment Channel
     addDiscordRole(msg,msgContent) {
@@ -180,7 +227,8 @@ class BotData {
                     .then(msg => msg.delete(PoroGame.Settings[0].TimeOut))},300))
                 .then(msg => msg.delete(PoroGame.Settings[0].TimeOut));
             setTimeout(function() { spawned = false; }, PoroGame.Settings[0].TimeOut);
-            let rand = Math.random() * (PoroGame.Settings[0].MaxIntVall - PoroGame.Settings[0].MinIntVall) + PoroGame.Settings[0].MinIntVall;
+            let rand = Math.round(Math.random() * (PoroGame.Settings[0].MaxIntVall - PoroGame.Settings[0].MinIntVall) + PoroGame.Settings[0].MinIntVall);
+            console.log(rand);
             looper = setTimeout(function() {
                 outerFunction();
                 loop();
@@ -225,6 +273,56 @@ class BotData {
            msg.channel.send(stm).then(msg => msg.delete(10000));
         });
     }
+
+    storeList(msg) {
+        let stm = "```\n";
+        for(let key in PoroGame.STORE) {
+            if(!PoroGame.STORE.hasOwnProperty(key)) continue;
+
+            let Store = PoroGame.STORE[key];
+            for(let key in Store) {
+                if(!Store.hasOwnProperty(key)) continue;
+                stm += "Item-Typ: "+Store[key][0].type + ": !" + Commands.COM_BUY_ITEM[0].command + " " + Store[key][0].name + " ----> Aktueller Preis: " + Store[key][0].prize + " Gold\n";
+            }
+        }
+        stm += "```";
+        msg.author.send(stm);
+    }
+    buyItem(msg, item) {
+        for (let key in PoroGame.STORE) {
+            if(!PoroGame.STORE.hasOwnProperty(key)) continue;
+            let existence = false;
+            let Store = PoroGame.STORE[key];
+            for (let key in Store) {
+                if(!Store.hasOwnProperty(key)) continue;
+
+                if(Store[key][0].name === item) {
+                    existence = true;
+                    connection.query('SELECT points FROM user WHERE discordID = '+msg.author.id+';', function (error, result) {
+                        if(error) throw error;
+
+                        if (!result[0]) {
+                            return msg.author.send(PoroGame.Lang[0].buy_notEnough);
+                        }
+
+                        if(result[0].points >= Store[key][0].prize) {
+                            msg.member.addRole(msg.guild.roles.find("name", Store[key][0].item)).catch(console.error);
+                            let gold = result[0].points - Store[key][0].prize;
+                            connection.query('UPDATE user SET points = '+gold+' WHERE discordID = '+msg.author.id+';', function (error) {
+                                if(error) throw error;
+                            });
+                            msg.author.send(PoroGame.Lang[0].buy_success);
+                        } else {
+                            msg.author.send(PoroGame.Lang[0].buy_notEnough);
+                        }
+                    });
+                }
+            }
+            if(!existence) {
+                msg.author.send(PoroGame.Lang[0].buy_notExist);
+            }
+        }
+    }
 }
 
 let bot = new BotData();
@@ -238,7 +336,6 @@ client.on("message", (message) => {
     if (message.channel.id === Channel.CH_ROLE_ASSIGNMENT && message.author.id !== Id.USER_BOT) {
         if(bot.checkValid(message.content,"onCommand")) {
             let msgCmd = message.content.substring(1).split(" ");
-            console.log(message.author.username);
 
             switch (msgCmd[0]) {
                 case Commands.COM_ADD_ROLE[0].command:
@@ -270,7 +367,6 @@ client.on("message", (message) => {
 
                 case Commands.COM_HELP[0].command:
                     bot.help(message);
-                    message.delete().catch(console.error);
                     break;
 
                 case Commands.COM_SPAWN_PORO[0].command:
@@ -306,6 +402,27 @@ client.on("message", (message) => {
                     bot.messageSend("errUser", message);
                     break;
             }
+        }
+    } else if(message.channel.id === Channel.CH_SHOP) {
+        if(bot.checkValid(message.content,"onCommand")) {
+            let msgCmd = message.content.substring(1).split(" ");
+
+            switch (msgCmd[0]) {
+
+                case Commands.COM_SHOW_STORE[0].command:
+                    bot.storeList(message);
+                    message.delete().catch(console.error);
+                    break;
+                case Commands.COM_BUY_ITEM[0].command:
+                    bot.buyItem(message, msgCmd[1]);
+                    message.delete().catch(console.error);
+                    break;
+                default:
+                    bot.messageSend("errUser", message);
+                    break;
+            }
+        } else {
+            message.delete().catch(console.error);
         }
     }
 });
