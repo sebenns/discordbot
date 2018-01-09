@@ -59,6 +59,11 @@ const Commands = {
         "description" : "Fange ein Poro ein!",
         "group" : "user",
     }],
+    "COM_OPEN" : [{
+        "command" : "open",
+        "description" : "Öffne eine Lootbox!",
+        "group" : "user",
+    }],
     "COM_SPAWN_PORO" : [{
         "command" : "spawn",
         "description" : "Spawnt ein Poro.",
@@ -125,36 +130,64 @@ const Game = {
 };
 
 const PoroGame = {
-    "Settings" : [{
+    "Settings" : {
         "TimeOut": "30000", // 30 Seconds TimeOut for PoroSpawn Message
         "MaxIntVall": 600000, // Max Interval for Spawning Time
         "MinIntVall": 300000, // Min Interval for Spawning Time
-        "spawned" : false, // Poro is not spawned at the beginning, default = false
+        "spawning" : {
+            "poro" : false, // Poro is not spawned at the beginning, default = false
+            "lootbox" : false,
+        },
         "spawnedType" : "",
-        "looper" : "",
-        "rmCatchNumb" : "" // Catch Numb will be generated and saved in this obj. const.
-    }],
-    "Lang" : [{
+        "looper" : 0,
+        "rmCatchNumb" : 0 // Catch Numb will be generated and saved in this obj. const.
+    },
+    "Lang" : {
         "bank_notEnough" : "Du hast zurzeit leider kein Gold. Du solltest Dir lieber etwas dazu verdienen! Nyo nyo nya nyo.",
         "bank_status" : "Du hast zurzeit `%s Gold`. Wenn Du nach neuen Accessoires suchst, versuche es mal im Poro-Shop! Nyo nya nya!",
         "buy_success" : "Dein gekauftes Item wurde Dir erfolgreich gutgeschrieben! Viel Spaß damit :) Non non nan nan!",
         "buy_notExist" : "Das von dir ausgesuchte Item existiert leider garnicht! Hast du Dich etwa vertippt, nya nya nyo?",
         "buy_notEnough" : "Du hast leider nicht genug Gold. Versuche es ein anderes Mal, du Gauner! NON NON NAN NON NANANAN NON "
-    }],
+    },
     "POROS": [{  // different Types of Poros. Maybe you wanna add some new one?
         "PORO": [{
             "appear" : "Ein wildes Poro ist erschienen!",
             "catch" : "Benutze `!%s %s` um das wilde Poro einzufangen!",
             "type" : "normal",
             "image" : "http://riverflowsinyou.de/scr/187d0fd46e07644bbcc52d1d08e0fba4.png",
-            "cought" : "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für **__%s Gold__** an einen kuriosen muskolösen bärtigen Mann verkauft."
+            "cought" : "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für **%s Gold** an einen kuriosen muskolösen bärtigen Mann verkauft."
         }],
         "TEEMORO" : [{
             "appear" : "Ein Teemoro kommt aus dem Jungle gerannt!",
             "catch" : "Benutze `!%s %s` um den Wicht zu fangen und zu zerstampfen!",
             "type" : "normal",
             "image" : "http://riverflowsinyou.de/scr/teemoro.png",
-            "cought" : "%s hat das Teemoro eingefangen und auf dem nächsten Scheiterhaufen zerstampft. Übrig geblieben sind **__%s Gold__** und ein Pilz."
+            "cought" : "%s hat das Teemoro eingefangen und auf dem nächsten Scheiterhaufen zerstampft. Übrig geblieben sind **%s Gold** und ein Pilz."
+        }],
+        "LOOTBOX" : [{
+            "appear" : "Eine Lootbox ist vom Himmel gefallen!?!",
+            "catch" : "Benutze `!%s %s` um die Lootbox zu öffnen und dein Glück herauszufordern!",
+            "type" : "lootbox",
+            "image" : "http://riverflowsinyou.de/scr/8.png",
+            "cought_1" : "%s hat die Lootbox geöffnet und erschaudert vor dem legendären Anblick eines **__%s__** Skins. Leider war es ein Duplikat. Schade aber auch :(. ( + **%s Gold** ).",
+            "cought_2" : "%s hat die Lootbox gegen die Wand geschmissen. Aus der Box fallen lauter wertlose Gegenstände. Das war wohl leider nix. Verkauft bringen sie trotzdem was! ( + **%s Gold** ).",
+            "cought_3" : "Eines Tages bekam %s - nach etlichen Versuchen mit dem Zahnstocher.. - die Lootbox schließlich auf. Drinnen war aber leider nichts. Vielleicht nächstes Mal?",
+            "loot" : "",
+            "the_main" : {
+                genji : "GENJI THE MAIN",
+                tracer : "TRACER THE WILD",
+                yasuo : "YASUO THE RET.. I MEAN.. GOD",
+                maudado : "MAUDA.. wrong game.. sorry",
+                dasgramma : "SUPERHACKA",
+                yusako : "NAMI MAIN INC.",
+                mercy : "GODLIKE MERCY",
+                ana : "WHO THE FUCK IS ANA?",
+                lucio : "LET'S BLOB THE SHIT OUT OF.. LUCIO",
+                symmetra : "RIGHT CLICK SYMMETRA",
+                pharah : "OP AS FUCK PHARAH",
+                widow : "ONE SHOT ONE KILL WIDOWMAKER"
+            }
+
         }]
     }],
     "STORE": [{  // Items for sell. Maybe some commands will be added.
@@ -205,31 +238,56 @@ class BotData {
         }
     }
     messageSend(type, msg, stm) {
-        let Settings = PoroGame.Settings[0];
+        let Settings = PoroGame.Settings;
         switch(type) {
             case "sucUser":
                 return msg.channel.send(vsprintf("Congratz %s! Non nan nan %s",[msg.author, client.emojis.find("name", "poro")])).then(msg => msg.delete(3000));
             case "errUser":
                 return msg.channel.send('Non nani?! :(').then(msg => msg.delete(3000));
             case "msgToAuthor":
-                return msg.author.send(stm).catch(logger.warn(console.error)).catch(logger.warn(console.error));
+                return msg.author.send(stm).catch(error => logger.warn(error));
             case "msgToChannel":
                 return msg.channel.send(stm).then(msg => msg.delete(15000));
             case "PoroSpawn":
                 let poro = this.pickRandomPoro(PoroGame.POROS[0]);
                 Settings.spawnedType = poro[1][0];
-                return msg.channel.send(Settings.spawnedType.appear, {file: Settings.spawnedType.image})
-                    .then(setTimeout(function(){msg.channel.send(vsprintf(Settings.spawnedType.catch,[Commands.COM_CATCH[0].command,Settings.rmCatchNumb]))
-                    .then(msg => msg.delete(Settings.TimeOut))},300))
-                    .then(msg => msg.delete(Settings.TimeOut)).catch(logger.warn(console.error));
+                if (Settings.spawnedType.type === "lootbox") {
+                    Settings.spawning.lootbox = true; // poro is spawned
+                    return msg.channel.send(Settings.spawnedType.appear, {file: Settings.spawnedType.image})
+                        .then(setTimeout(function () {
+                            msg.channel.send(vsprintf(Settings.spawnedType.catch, [Commands.COM_OPEN[0].command, Settings.rmCatchNumb]))
+                                .then(msg => msg.delete(Settings.TimeOut))
+                        }, 300))
+                        .then(msg => msg.delete(Settings.TimeOut)).catch(error => logger.warn(error));
+                } else {
+                    Settings.spawning.poro = true; // poro is spawned
+                    return msg.channel.send(Settings.spawnedType.appear, {file: Settings.spawnedType.image})
+                        .then(setTimeout(function () {
+                            msg.channel.send(vsprintf(Settings.spawnedType.catch, [Commands.COM_CATCH[0].command, Settings.rmCatchNumb]))
+                                .then(msg => msg.delete(Settings.TimeOut))
+                        }, 300))
+                        .then(msg => msg.delete(Settings.TimeOut)).catch(error => logger.warn(error));
+                }
             case "PoroCought":
                 return msg.channel.send(vsprintf(Settings.spawnedType.cought, [msg.author,stm ])).then(msg => msg.delete(Settings.TimeOut));
+            case "PoroLootbox":
+                let main = this.pickRandomPoro(PoroGame.POROS[0].LOOTBOX[0].the_main);
+                switch(PoroGame.POROS[0].LOOTBOX[0].loot) {
+                    case 1:
+                        return msg.channel.send(vsprintf(Settings.spawnedType.cought_1, [msg.author,main[1],stm ])).then(msg => msg.delete(Settings.TimeOut));
+                    case 2:
+                        return msg.channel.send(vsprintf(Settings.spawnedType.cought_2, [msg.author,stm])).then(msg => msg.delete(Settings.TimeOut));
+                    case 3:
+                        return msg.channel.send(vsprintf(Settings.spawnedType.cought_3, [msg.author])).then(msg => msg.delete(Settings.TimeOut));
+                    default:
+                        return logger.warn("Error");
+                }
             case "Bank":
-                let bank = PoroGame.Lang[0];
+                let bank = PoroGame.Lang;
                 if (!stm) {
-                    return msg.author.send(bank.bank_notEnough).catch(logger.warn(console.error));
+                    return msg.author.send(bank.bank_notEnough).catch(error => logger.warn(error));
                 } else {
-                    return msg.author.send(vsprintf(bank.bank_status,[stm.points])).catch(logger.warn(console.error));
+                    return msg.author.send(vsprintf(bank.bank_status,[stm.points])).catch(error => logger.warn(error));
                 }
         }
     }
@@ -265,7 +323,7 @@ class BotData {
         if (msgContent) {
             for (let key in Game) {
                 if (Game[key][0].alias.toLowerCase() === msgContent.toLowerCase()) {
-                    msg.member.addRole(msg.guild.roles.find("name", Game[key][0].role)).catch(logger.warn(console.error));
+                    msg.member.addRole(msg.guild.roles.find("name", Game[key][0].role)).catch(error => logger.warn(error));
                     return this.messageSend("sucUser", msg);
                 }
             }
@@ -276,7 +334,8 @@ class BotData {
         if (msgContent) {
             for (let key in Game) {
                 if (Game[key][0].alias.toLowerCase() === msgContent.toLowerCase()) {
-                    msg.member.removeRole(msg.guild.roles.find("name", Game[key][0].role)).catch(logger.warn(console.error));
+                    msg.member.removeRole(msg.guild.roles.find("name", Game[key][0].role)).catch(error => logger.warn(error)
+                    );
                     return this.messageSend("sucUser", msg);
                 }
             }
@@ -288,13 +347,16 @@ class BotData {
     spawnPoro(msg) {
         if (this.checkValid(msg, "onAdmin")) {
             (function loop() {
-                let Settings = PoroGame.Settings[0];
+                let Settings = PoroGame.Settings;
                 let rand = Math.round(Math.random() * (Settings.MaxIntVall - Settings.MinIntVall) + Settings.MinIntVall); // random TimeOut for loop Intval
-                Settings.spawned = true; // poro is spawned
                 Settings.rmCatchNumb = Math.floor(1000 + Math.random() * 9000); // 0000x4 - Random Number for catching the 'poroboro'
                 bot.messageSend("PoroSpawn", msg);
                 setTimeout(function () {
-                    Settings.spawned = false;
+                    if (Settings.spawning.lootbox) {
+                        Settings.spawning.lootbox = false;
+                    } else {
+                        Settings.spawned = false;
+                    }
                 }, Settings.TimeOut);
                 Settings.looper = setTimeout(function () {
                     loop();
@@ -304,7 +366,7 @@ class BotData {
     }
     spawnStop(msg) {
         if (this.checkValid(msg, "onAdmin")) {
-            clearTimeout(PoroGame.Settings[0].looper);
+            clearTimeout(PoroGame.Settings.looper);
         }
     }
     pickRandomPoro(obj) {
@@ -313,11 +375,33 @@ class BotData {
         objArr = Object.entries(obj)[rmNumb-1];
         return objArr;
     }
-    catchPoro(msg, number) {
-        let Settings = PoroGame.Settings[0];
-        if((Settings.spawned) && (number == Settings.rmCatchNumb)) {
-            let gold = Math.floor((Math.random() * 30) + 40);
-            Settings.spawned = false;
+    catchPoro(msg, number, catchType) {
+        let Settings = PoroGame.Settings;
+        let gold = 0;
+        if((Settings.spawning.lootbox) && (number == Settings.rmCatchNumb) && (catchType === "open")) {
+            let rmNumb = Math.floor(Math.random() * 3) + 1;
+            logger.info(rmNumb);
+            switch(rmNumb) {
+                case 1:
+                    PoroGame.POROS[0].LOOTBOX[0].loot = 3;
+                    break;
+                case 2:
+                    gold = Math.floor((Math.random() * 21) + 40);
+                    PoroGame.POROS[0].LOOTBOX[0].loot = 2;
+                    break;
+                case 3:
+                    gold = Math.floor((Math.random() * 41) + 80);
+                    PoroGame.POROS[0].LOOTBOX[0].loot = 1;
+                    break;
+            }
+            Settings.spawning.lootbox = false;
+            this.messageSend("PoroLootbox",msg,gold);
+            connection.query('INSERT INTO user(discordID, points) VALUES('+msg.author.id+','+gold+') ON DUPLICATE KEY UPDATE points = points + '+gold+' ;', function (error) {
+                if (error) throw error;
+            });
+        } else if((Settings.spawning.poro) && (number == Settings.rmCatchNumb) && (catchType === "catch")) {
+            gold = Math.floor((Math.random() * 30) + 40);
+            Settings.spawning.poro = false;
             this.messageSend("PoroCought",msg,gold);
             connection.query('INSERT INTO user(discordID, points) VALUES('+msg.author.id+','+gold+') ON DUPLICATE KEY UPDATE points = points + '+gold+' ;', function (error) {
                 if (error) throw error;
@@ -365,7 +449,7 @@ class BotData {
     }
     buyItem(msg, item) {
         for (let key in PoroGame.STORE) {
-            let lang = PoroGame.Lang[0];
+            let lang = PoroGame.Lang;
             if(!PoroGame.STORE.hasOwnProperty(key)) continue;
             let existence = false;
             let Store = PoroGame.STORE[key];
@@ -382,7 +466,7 @@ class BotData {
                         }
 
                         if(result[0].points >= Store[key][0].prize) {
-                            msg.member.addRole(msg.guild.roles.find("name", Store[key][0].item)).catch(logger.warn(console.error));
+                            msg.member.addRole(msg.guild.roles.find("name", Store[key][0].item)).catch(error => logger.warn(error));
                             let gold = result[0].points - Store[key][0].prize;
                             connection.query('UPDATE user SET points = '+gold+' WHERE discordID = '+msg.author.id+';', function (error) {
                                 if(error) throw error;
@@ -423,7 +507,7 @@ class BotData {
                 result[4] = "";
             }
             let memegenURL = "https://memegen.link/" + result[1] + "/" + result[2] + result[3] + ".jpg" + result[4];
-            msg.channel.send("Erstellt von " + msg.author + "\n", {file: memegenURL}).catch(logger.warn(console.error));
+            msg.channel.send("Erstellt von " + msg.author + "\n", {file: memegenURL}).catch(error => logger.warn(error));
         } else {
             this.messageSend("errUser",msg);
         }
@@ -464,7 +548,7 @@ client.on("message", (message) => {
         if (bot.checkValid(message.content, "onCommand")) {
             let msgCmd = message.content.substring(1).split(" ");
             log.command(message, msgCmd, message.channel.id);
-            message.delete().catch(logger.warn(console.error));
+            message.delete().catch(error => logger.warn(error));
             // Command Usage in Assignment Channel, Listed Commands: addRole, removeRole, help.
             if (message.channel.id === Channel.CH_ROLE_ASSIGNMENT) {
                 switch (msgCmd[0].toLowerCase()) {
@@ -480,7 +564,7 @@ client.on("message", (message) => {
                 }
 
             // Command Usage in Development Channel or Lobby Channel: help, spawn, catch, gold, rank
-            } else if (message.channel.id === Channel.CH_LOBBY) {
+            } else if (message.channel.id === Channel.CH_LOBBY || message.channel.id === Channel.CH_DEVELOPMENT) {
                 switch (msgCmd[0].toLowerCase()) {
 
                     case Commands.COM_HELP[0].command.toLowerCase():
@@ -496,7 +580,10 @@ client.on("message", (message) => {
                         return bot.spawnStop(message);
 
                     case Commands.COM_CATCH[0].command:
-                        return bot.catchPoro(message, msgCmd[1]);
+                        return bot.catchPoro(message, msgCmd[1], "catch");
+
+                    case Commands.COM_OPEN[0].command:
+                        return bot.catchPoro(message, msgCmd[1], "open");
 
                     case Commands.COM_SHOW_GOLD[0].command:
                         return bot.showGold(message);
@@ -543,7 +630,7 @@ client.on("message", (message) => {
                 }
             }
         } else if (message.channel.id === Channel.CH_ROLE_ASSIGNMENT || message.channel.id === Channel.CH_SHOP) {
-            message.delete().catch(logger.warn(console.error));
+            message.delete().catch(error => logger.warn(error));
         }
     }
 });
