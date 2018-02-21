@@ -2,17 +2,17 @@
 const Discord = require("discord.js");
 const token = "Mzk3MDYzOTMwMTgwMTQxMDU3.DSqwHg.Wy24nFb5GGt8pirb5f6bTDRJZ0E";
 const client = new Discord.Client();
+
 // NodeJS modules, incl. configurations
 const mysql = require('mysql');
 let connection = mysql.createConnection({
     host     : 'localhost',
     user     : 'discord',
     password : 'kutterbrot45Ab',
-    database : 'discord_porogame'
+    database : 'discord_porobot'
 });
 
 const vsprintf = require('sprintf').vsprintf;
-const request = require("request");
 
 const log4js = require('log4js');
 const log4js_extend = require("log4js-extend");
@@ -26,247 +26,116 @@ log4js.configure({
         default: { appenders: [ 'out', 'app' ], level: 'debug' }
     }
 });
-
 log4js_extend(log4js, {
     path: __dirname,
     format: "at @name (@file:@line:@column)"
 });
 
 // Import const/ files.
-const Commands = require("./const/commands.js");
-const Channel = require("./const/channels.js");
-const Id = require("./const/ids.js");
-const PoroGame = require("./const/porogame.js");
-const cV = require("./const/checkValid.js");
-const mS = require("./const/messageSend.js");
-
-//Games for addRole/removeRole Command. Rewrite for Database
-const Game = {
-    "LOL" : {
-        "role" : "League of Legends",
-        "alias" : "LoL"
-    },
-    "OVERWATCH" : {
-        "role" : "Overwatch",
-        "alias" : "Overwatch"
-    }
-};
+const COMMANDS = require("./const/commands.js");
+const POROGAME = require("./const/porogame.js");
+const STOREITEMS = require("./const/store.js");
+const LANG = require("./const/language.js");
 
 class BotData {
 
-    // Standard Methods
-    checkValid(msg,type,numb) {
-        switch(type) {
-            case cV.onCommand:
-                return (msg.startsWith("!"));
-            case cV.onAdmin:
-                return (msg.member.roles.find("name", Id.GROUP_ADMIN));
-            default:
-                logger.warn("No fitting type when calling checkValid(%s, %s, %s).", msg, type, numb);
-        }
+    permissionChecker(msg, permission) {
+        return msg.member.roles.has(permission);
     }
-    messageSend(type, msg, stm) {
-        let Settings = PoroGame.Settings;
-        switch(type) {
-            case mS.sucUser:
-                return msg.channel.send(vsprintf("Congratz %s! Non nan nan %s",[msg.author, client.emojis.find("name", "poro")])).then(msg => msg.delete(3000));
-            case mS.errUser:
-                return msg.channel.send('Non nani?! :(').then(msg => msg.delete(3000));
-            case mS.msgToAuthor:
-                return msg.author.send(stm).catch(logger.warn);
-            case mS.msgToChannel:
-                return msg.channel.send(stm).then(msg => msg.delete(15000));
-            case mS.PoroSpawn:
-                let poro = this.chooseRandomAttribute(PoroGame.POROS);
-                Settings.spawnedType = poro[1];
-                return this.doSpawning(msg, Settings.spawnedType.type);
-            case mS.PoroCaught:
-                return msg.channel.send(vsprintf(Settings.spawnedType.caught, [msg.author,stm ])).then(msg => msg.delete(Settings.TimeOut));
-            case mS.PoroLootbox:
-                let main = this.chooseRandomAttribute(PoroGame.POROS.LOOTBOX.the_main);
-                switch(PoroGame.POROS.LOOTBOX.loot) {
-                    case 1: // legendary lootbox
-                        return msg.channel.send(vsprintf(Settings.spawnedType.caught_1, [msg.author,main[1],stm ])).then(msg => msg.delete(Settings.TimeOut));
-                    case 2: // normal lootbox
-                        return msg.channel.send(vsprintf(Settings.spawnedType.caught_2, [msg.author,stm])).then(msg => msg.delete(Settings.TimeOut));
-                    case 3: // useless lootbox
-                        return msg.channel.send(vsprintf(Settings.spawnedType.caught_3, [msg.author])).then(msg => msg.delete(Settings.TimeOut));
-                    default:
-                        return logger.warn("Error");
-                }
-            case mS.Bank:
-                let bank = PoroGame.Lang;
-                if (!stm) {
-                    return msg.author.send(bank.bank_notEnough).catch(error => logger.warn(error));
-                } else {
-                    return msg.author.send(vsprintf(bank.bank_status,[stm.points])).catch(error => logger.warn(error));
-                }
-            default:
-                logger.warn("No fitting type when calling messageSend(%s, %s, %s).", msg, type, stm);
-        }
+    convertNickToID(nickname) {
+        if(typeof nickname !== "string") return false;
+        return nickname.toString().replace(/[<>@!]/g, "");
     }
 
-    doSpawning(msg, type) {
-        let commandToUse = 0;
-        let Settings = PoroGame.Settings;
-        if(type === "lootbox") {
-            commandToUse = Commands.COM_OPEN.command;
-            Settings.spawning.lootbox = true;
-        } else {
-            commandToUse = Commands.COM_CATCH.command;
-            Settings.spawning.poro = true;
-        }
-        return msg.channel.send(Settings.spawnedType.appear, {file: Settings.spawnedType.image})
-            .then(setTimeout(function () {
-                msg.channel.send(vsprintf(Settings.spawnedType.catch, [commandToUse, Settings.rmCatchNumb]))
-                    .then(msg => msg.delete(Settings.TimeOut))
-            }, 300))
-            .then(msg => msg.delete(Settings.TimeOut)).catch(logger.warn);
-    }
-
-    // Start Commands
-    help(msg, type) {
-        let stm;
-        let grp;
-        if (type === Commands.COM_HELP.command) {
-            grp = "user";
-        } else {
-            grp = "admin"
-        }
-
-        stm = "```\nVerfügbare Befehle:\n----------\n";
-        for (let key in Commands) {
-            if (Commands[key].group === grp) {
-                stm += "!" + Commands[key].command + " ---> " + Commands[key].description + "\n";
+    help(msg, command) {
+        if (command) {
+            for (let key in COMMANDS) {
+                if(COMMANDS[key].COMMAND.toLowerCase() === command.toLowerCase()) return messager.messageToChannel(msg, "`"+COMMANDS[key].SYNTAX+"`", 6000);
             }
         }
+        let stm, grp = "user";
+        stm = LANG.COMMANDS.HELP.STATEMENT_HEADER;
+        for (let key in COMMANDS) {
+            if (COMMANDS[key].GROUP === grp && !this.permissionChecker(msg, LANG.PERMISSIONS.ADMIN)) {
+                stm += "!" + COMMANDS[key].COMMAND + " ---> | " + COMMANDS[key].DESCRIPTION + "\n";
+            } else if (this.permissionChecker(msg, LANG.PERMISSIONS.ADMIN)) {
+                stm += "!" + COMMANDS[key].COMMAND + " ---> | " + COMMANDS[key].DESCRIPTION + "\n";
+            }
+        }
+
         stm += "```";
-        if (grp === "admin") return this.messageSend(mS.msgToAuthor, msg, stm);
-        return this.messageSend(mS.msgToChannel, msg, stm);
+        return messager.messageToAuthor(msg, stm);
     }
 
-    // Assignment Channel
-    addDiscordRole(msg,msgContent) {
-        if (msgContent) {
-            for (let key in Game) {
-                if (Game[key].alias.toLowerCase() === msgContent.toLowerCase()) {
-                    msg.member.addRole(msg.guild.roles.find("name", Game[key].role)).catch(error => logger.warn(error));
-                    return this.messageSend(mS.sucUser, msg);
-                }
-            }
-            return this.messageSend(mS.errUser, msg);
-        }
+}
+class Messager {
+    messageToChannel(msg, stm, timeout) {
+        msg.channel.send(stm)
+            .then(msg => { msg.delete(timeout); LANG.MESSAGE.ID = msg.id; })
+            .catch(logger.warn);
     }
-    removeDiscordRole(msg,msgContent) {
-        if (msgContent) {
-            for (let key in Game) {
-                if (Game[key].alias.toLowerCase() === msgContent.toLowerCase()) {
-                    msg.member.removeRole(msg.guild.roles.find("name", Game[key].role)).catch(error => logger.warn(error)
-                    );
-                    return this.messageSend(mS.sucUser, msg);
-                }
-            }
-            return this.messageSend(mS.errUser, msg);
-        }
+    messageToChannelWithImage(msg, stm, image, timeout) {
+        msg.channel.send(stm, {file: image})
+            .then(msg => { msg.delete(timeout); LANG.MESSAGE.ID = msg.id; })
+            .catch(logger.warn);
     }
-
-    // Poro MiniGame
-    spawnPoro(msg) {
-        if (this.checkValid(msg, cV.onAdmin)) {
-            let _this = this;
-            (function loop() {
-                let Settings = PoroGame.Settings;
-                let rand = Math.round(Math.random() * (Settings.MaxIntVall - Settings.MinIntVall) + Settings.MinIntVall); // random TimeOut for loop Intval
-                Settings.rmCatchNumb = Math.floor(1000 + Math.random() * 9000); // 0000x4 - Random Number for catching the 'poroboro'
-                _this.messageSend(mS.PoroSpawn, msg);
-                setTimeout(function () {
-                    if (Settings.spawning.lootbox) {
-                        Settings.spawning.lootbox = false;
-                    } else {
-                        Settings.spawning.poro = false;
-                    }
-                }, Settings.TimeOut);
-                Settings.looper = setTimeout(function () {
-                    loop();
-                }, rand);
-            }());
-        }
+    messageToAuthor(msg, stm) {
+        msg.author.send(stm)
+            .then(msg => { LANG.MESSAGE.ID = msg.id; })
+            .catch(logger.warn);
     }
-    spawnStop(msg) {
-        if (this.checkValid(msg, cV.onAdmin)) {
-            clearTimeout(PoroGame.Settings.looper);
-        }
+    messageToAuthorWithImage(msg, stm, image) {
+        msg.author.send(stm, {file: image})
+            .then(msg => { LANG.MESSAGE.ID = msg.id; })
+            .catch(logger.warn);
     }
-    chooseRandomAttribute(obj) {
-        let objArr = Object.keys(obj);
-        let rmNumb = Math.floor(Math.random() * objArr.length) + 1;
-        objArr = Object.entries(obj)[rmNumb-1];
-        return objArr;
+    messageToUser(msg, ID, stm) {
+        msg.guild.members.find("id", ID).send(stm)
+            .then(msg => { LANG.MESSAGE.ID = msg.id })
+            .catch(logger.warn);
     }
-    catchPoro(msg, number, catchType) {
-        let Settings = PoroGame.Settings;
-        let gold = 0;
-        if((Settings.spawning.lootbox) && (number == Settings.rmCatchNumb) && (catchType === "open")) {
-            let rmNumb = Math.floor(Math.random() * 3) + 1;
-            logger.info(rmNumb);
-            switch(rmNumb) {
-                case 1:
-                    PoroGame.POROS.LOOTBOX.loot = 3;
-                    break;
-                case 2:
-                    gold = Math.floor((Math.random() * 21) + 40);
-                    PoroGame.POROS.LOOTBOX.loot = 2;
-                    break;
-                case 3:
-                    gold = Math.floor((Math.random() * 41) + 80);
-                    PoroGame.POROS.LOOTBOX.loot = 1;
-                    break;
-            }
-            Settings.spawning.lootbox = false;
-            this.messageSend(mS.PoroLootbox,msg,gold);
-            connection.query('INSERT INTO user(discordID, points) VALUES('+msg.author.id+','+gold+') ON DUPLICATE KEY UPDATE points = points + '+gold+' ;', function (error) {
-                if (error) throw error;
-            });
-        } else if((Settings.spawning.poro) && (number == Settings.rmCatchNumb) && (catchType === "catch")) {
-            gold = Math.floor((Math.random() * 30) + 40);
-            Settings.spawning.poro = false;
-            this.messageSend(mS.PoroCaught,msg,gold);
-            connection.query('INSERT INTO user(discordID, points) VALUES('+msg.author.id+','+gold+') ON DUPLICATE KEY UPDATE points = points + '+gold+' ;', function (error) {
-                if (error) throw error;
-            });
-        }
+    messageToUserWithImage(msg, ID, stm, image) {
+        msg.guild.members.find("id", ID).send(stm, {file: image})
+            .then(msg => { LANG.MESSAGE.ID = msg.id })
+            .catch(logger.warn);
     }
-    listLoot(msg) {
-        if(this.checkValid(msg, cV.onAdmin)) {
-            connection.query('SELECT * FROM loot;', function(error,result) {
-                if(error) throw error;
-                let stm = "```Lootable Items in Database:\n\n";
-                for (let key in result) {
-                    if (result.hasOwnProperty(key)) {
-                        stm += "ID: " + result[key].id + " |   Name: " + result[key].name + "    |   Beschreibung: " + result[key].description + "\n";
-                        if (stm.length >= 1900) {
-                            bot.messageSend(mS.msgToAuthor,msg,stm);
-                            stm = "```";
-                        }
-                    }
-                }
-                stm +="```";
-                bot.messageSend(mS.msgToAuthor,msg,stm);
-            });
-        }
+    deleteMessageByID(msg, ID) {
+        return msg.channel.fetchMessage(ID)
+            .then(message => message.delete())
+            .catch(logger.warn);
     }
-
-    showGold(msg) {
-        connection.query('SELECT points FROM user WHERE discordID = '+msg.author.id+';', function (error, result) {
-            if(error) logger.warn(error);
-            bot.messageSend(mS.Bank, msg, result[0]);
+}
+class Currency {
+    showCurrencyByID(msg, ID) {
+        connection.query('SELECT points FROM user WHERE discordID = '+ID+' ;', function (error, result) {
+            if (error) logger.warn(error);
+            if (!result[0] || result[0] === 0) return messager.messageToAuthor(msg, LANG.CURRENCY.BANK.STATUS_NO_MONEY);
+            messager.messageToAuthor(msg, vsprintf(LANG.CURRENCY.BANK.STATUS_SELECTED_USER,[result[0].points]));
         });
     }
-    showRanking(msg) {
+    takeCurrencyByID(ID,amount) {
+        connection.query('UPDATE user SET points = points - '+amount+' WHERE discordID = '+ID+';', function (error) {
+            if (error) logger.warn(error);
+        });
+    }
+    giveCurrencyByID(ID,amount) {
+        connection.query('INSERT INTO user(discordID, points) VALUES('+ID+','+amount+') ON DUPLICATE KEY UPDATE points = points + '+amount+' ;', function (error) {
+            if (error) logger.warn(error);
+        });
+    }
+    showCurrency(msg, nickname) {
+        if (nickname && bot.permissionChecker(msg, LANG.PERMISSIONS.ADMIN)) {
+            return this.showCurrencyByID(msg, bot.convertNickToID(nickname));
+        }
+        connection.query('SELECT points FROM user WHERE discordID = '+msg.author.id+';', function (error, result) {
+            if(error) logger.warn(error);
+            return messager.messageToAuthorWithImage(msg, vsprintf(LANG.CURRENCY.BANK.STATUS,[result[0].points]), LANG.CURRENCY.BANK.IMAGE);
+        });
+    }
+    showCurrencyRanking(msg) {
         connection.query('SELECT * FROM user ORDER BY points DESC;', function (error, result) {
             if(error) logger.warn(error);
-            let rank = 0;
-            let stm = "Ranking - ( Top 5 ) " + client.emojis.find("name", "kiste") +": \n\n";
+            let rank = 0, stm = "Ranking - ( Top 5 ) " + client.emojis.find("name", "snake-1") +": \n\n";
             for (let key in result) {
                 if (result.hasOwnProperty(key) && msg.guild.member(result[key].discordID) != null) {
                     rank++;
@@ -276,109 +145,398 @@ class BotData {
                     }
                 }
             }
-            bot.messageSend(mS.msgToChannel,msg,stm);
-        });
-    }
-
-    storeList(msg) {
-        let stm = "```\n";
-        for(let key in PoroGame.STORE) {
-            if(!PoroGame.STORE.hasOwnProperty(key)) continue;
-
-            let Store = PoroGame.STORE[key];
-            for(let key in Store) {
-                if(!Store.hasOwnProperty(key)) continue;
-                stm += "Item-Typ: "+Store[key].type + ": !" + Commands.COM_BUY_ITEM.command + " " + Store[key].name + " ----> Aktueller Preis: " + Store[key].price + " Gold\n";
-            }
-        }
-        stm += "```";
-        this.messageSend(mS.msgToChannel,msg,stm);
-    }
-    buyItem(msg, item) {
-        for (let key in PoroGame.STORE) {
-            let lang = PoroGame.Lang;
-            if(!PoroGame.STORE.hasOwnProperty(key)) continue;
-            let existence = false;
-            let Store = PoroGame.STORE[key];
-            for (let key in Store) {
-                if(!Store.hasOwnProperty(key)) continue;
-
-                if(Store[key].name === item) {
-                    existence = true;
-                    connection.query('SELECT points FROM user WHERE discordID = '+msg.author.id+';', function (error, result) {
-                        if(error) logger.warn(error);
-
-                        if(!result[0] && result[0].points >= Store[key].price) {
-                            msg.member.addRole(msg.guild.roles.find("name", Store[key].item)).catch(error => logger.warn(error));
-                            let gold = result[0].points - Store[key].price;
-                            connection.query('UPDATE user SET points = '+gold+' WHERE discordID = '+msg.author.id+';', function (error) {
-                                if(error) throw error;
-                            });
-                            bot.messageSend(mS.msgToChannel,msg,lang.buy_success);
-                        } else {
-                            bot.messageSend(mS.msgToChannel,msg,lang.buy_notEnough);
-                        }
-                    });
-                }
-            }
-            if(!existence) {
-                msg.author.send(lang.buy_notExist);
-            }
-        }
-    }
-
-    //Meme Generator
-    memeGen(msg, msgContent) {
-        let regx = /\s\s*(?=(?:[^"]|"[^"]*")*$)/g;
-        let result = [].map.call(msgContent.split(regx), function(el) { return el.replace(/^"|"$/g, '');});
-        if (result.length > 2) {
-            // result[0] = Command, result[1] = image or custom, result[2] = text, result[3] = text, result[4] url if custom.
-            result[2] = result[2].replace(/\?/g, "~q").replace(/\//g, "~s").replace(/#/g, "~h").replace(/%/g, "~p");
-            if (result[3]) { //if result[3], switch result[3] with result[4] if someone only writes top_text
-                if (result[3].startsWith("http")) {
-                    result[4] = result[3];
-                    result[3] = "";
-                } else {
-                    result[3] = "/" + result[3].replace(/\?/g, "~q").replace(/\//g, "~s").replace(/#/g, "~h").replace(/%/g, "~p");
-                }
-            } else {
-                result[3] = "";
-            }
-            if ((result[1] === "custom" || result[1] === "c") && (result[3] && result[3].startsWith("http") || result[4] && result[4].startsWith("http"))) {
-                result[4] = "?alt=" + result[4];
-            } else {
-                result[4] = "";
-            }
-            let memegenURL = "https://memegen.link/" + result[1] + "/" + result[2] + result[3] + ".jpg" + result[4];
-            msg.channel.send("Erstellt von " + msg.author + "\n", {file: memegenURL}).catch(error => logger.warn(error));
-        } else {
-            this.messageSend(mS.errUser,msg);
-        }
-    }
-    memeHelp(msg){ // json request
-        let url = "https://memegen.link/api/search/";
-
-        request({
-            url: url,
-            json: true
-        }, function (error, response, body) {
-
-            if (!error && response.statusCode === 200) {
-                let stm = "```\n Verfügbare Möglichkeiten:\n !"+Commands.COM_MEMEGEN.command+" Image \"Text 1\" \"Text 2\"\n\n Mit eigenem Bild: \n !"+Commands.COM_MEMEGEN.command+" custom \"Text1\" \"Text2\" Bild-URL\n\n Verfügbare Images:\n";
-                for(let key in body) {
-                    if(body.hasOwnProperty(key)) {
-                        let imageURL = body[key].template.blank.split("/");
-                        stm +=  imageURL[3]+", "; // Print the json response
-                    }
-                }
-                stm += "\n```";
-                bot.messageSend(mS.msgToAuthor,msg, stm);
-            }
+            messager.messageToChannel(msg, stm, 15000);
         });
     }
 }
 
+class Store {
+    constructor() {
+        this.existence = false;
+    }
+    storeList(msg) {
+        let stm = "```\n";
+        for(let key in STOREITEMS.ITEMS) {
+            if(!STOREITEMS.ITEMS.hasOwnProperty(key)) continue;
+
+            let ITEM = STOREITEMS.ITEMS[key];
+            for(let key in ITEM) {
+                if(!ITEM.hasOwnProperty(key)) continue;
+                if(ITEM[key].TYPE === 2) {
+                    stm += "Command: !" + ITEM[key].ALIAS + " --> Aktueller Preis: " + ITEM[key].GOLD + " Gold\n" +
+                        "Beschreibung: " + ITEM[key].DESCRIPTION + "\n\n";
+                    continue;
+                }
+                stm += "Command: !" + COMMANDS.BUY_ITEM.COMMAND + " " + ITEM[key].ALIAS + " --> Aktueller Preis: " + ITEM[key].GOLD + " Gold\n" +
+                    "Beschreibung: " + ITEM[key].DESCRIPTION + "\n";
+            }
+        }
+        stm += "```";
+        return messager.messageToChannel(msg, stm, 15000);
+    }
+    buyItem(msg, item) {
+        for (let key in STOREITEMS.ITEMS) {
+            if(!STOREITEMS.ITEMS.hasOwnProperty(key)) continue;
+            let ITEM = STOREITEMS.ITEMS[key];
+            for (let key in ITEM) {
+                if(!ITEM.hasOwnProperty(key)) continue;
+                if (ITEM[key].ALIAS === item) {
+                    this.existence = true;
+                    connection.query('SELECT points FROM user WHERE discordID = ' + msg.author.id + ';', function (error, result) {
+                        if (error) logger.warn(error);
+
+                        if (result[0] && (result[0].points >= ITEM[key].GOLD)) {
+                            switch (ITEM[key].TYPE) {
+                                case 0:
+                                    msg.member.addRole(msg.guild.roles.find("name", ITEM[key].ITEM)).catch(error => logger.warn(error));
+                                    break;
+                                case 1:
+                                    flower.buyFlower(msg);
+                                    break;
+                                default:
+                                    return messager.messageToChannel(msg,LANG.STORE.ITEM_DOES_NOT_EXIST, 15000);
+                            }
+                            currency.takeCurrencyByID(msg.author.id, ITEM[key].GOLD);
+                            messager.messageToChannel(msg,LANG.STORE.ITEM_BOUGHT_SUCCESSFULLY,15000);
+                        } else {
+                            messager.messageToChannel(msg,LANG.STORE.NOT_ENOUGH_MONEY, 15000);
+                        }
+                    });
+                }
+            }
+        }
+        if(!this.existence) {
+            messager.messageToChannel(msg,LANG.STORE.ITEM_DOES_NOT_EXIST,15000);
+        }
+    }
+    sellItem(msg, item) {
+        for (let key in STOREITEMS.ITEMS) {
+            if(!STOREITEMS.ITEMS.hasOwnProperty(key)) continue;
+            let ITEM = STOREITEMS.ITEMS[key];
+            for (let key in ITEM) {
+                if(!ITEM.hasOwnProperty(key)) continue;
+                if (ITEM[key].ALIAS === item) {
+                    this.existence = true;
+
+                    switch (ITEM[key].TYPE) {
+                        case 0:
+                            return messager.messageToChannel(msg, LANG.STORE.ITEM_CANT_BE_SOLD, 15000);
+                        case 1:
+                            flower.sellFlower(msg);
+                            break;
+                        default:
+                            return messager.messageToChannel(msg, LANG.STORE.ITEM_DOES_NOT_EXIST, 15000);
+                    }
+                }
+            }
+        }
+        if(!this.existence) {
+            messager.messageToChannel(msg,LANG.STORE.ITEM_DOES_NOT_EXIST,15000);
+        }
+    }
+}
+class Poro {
+    constructor() {
+        this.objectSpawned = false; // true, false
+        this.spawnerInterval = null; // function()
+        this.catchNumber = 1234; // 4-digits rmNumb
+        this.object = []; // objectArr
+        this.spawnTimeOut = POROGAME.SETTINGS.TIMEOUT; // Spawn Message disappears
+        this.earnGold = 0; // gold 2 earn
+    }
+    // general methods
+    spawnCommand(msg) { // check permissions before executing
+        if (!bot.permissionChecker(msg, LANG.PERMISSIONS.ADMIN)) return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+        let _this = this;
+        (function loop() {
+            let rand = Math.round(Math.random() * (POROGAME.SETTINGS.MAX_SPAWN_INTERVAL - POROGAME.SETTINGS.MIN_SPAWN_INTERVAL) + POROGAME.SETTINGS.MIN_SPAWN_INTERVAL); // random TimeOut for loop Intval
+            _this.catchNumber = Math.floor(1000 + Math.random() * 9000); // 0000x4 - Random Number for catching the 'poroboro'
+            _this.doSpawning(msg);
+            logger.info(rand);
+            setTimeout(function () {
+                this.objectSpawned = false;
+            }, _this.spawnTimeOut);
+            _this.spawnerInterval = setTimeout(function () {
+                loop();
+            }, rand);
+        }());
+    }
+    spawnStop(msg) { // check permissions before executing
+        if(!bot.permissionChecker(msg, LANG.PERMISSIONS.ADMIN)) return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+        clearInterval(this.spawnerInterval);
+    }
+    doSpawning(msg) {
+        let _this = this;
+        this.objectSpawned = true;
+        this.object = this.pickRandomAttribute(POROGAME.OBJECTS);
+        messager.messageToChannelWithImage(msg, this.object[1].APPEAR, this.object[1].IMAGE, this.spawnTimeOut);
+        setTimeout(function() {
+            _this.catchMsg = messager.messageToChannel(msg, vsprintf(_this.object[1].CATCH, [_this.object[1].COMMAND_TO_USE, _this.catchNumber]), _this.spawnTimeOut);
+        }, 500);
+    }
+    pickRandomAttribute(obj) {
+        let objArr = Object.keys(obj);
+        let rmNumb = Math.floor(Math.random() * objArr.length) + 1;
+        objArr = Object.entries(obj)[rmNumb-1];
+        return objArr;
+    }
+    catchObject(msg, catchNumber, command) {
+        if (this.object[1].COMMAND_TO_USE !== command) return;
+        if (this.objectSpawned) {
+            // delete Spawn-Messages
+            this.objectSpawned = false;
+            clearTimeout(this.spawnerTimeOut);
+            switch (this.object[1].TYPE) {
+                // Type 0 = normal objects
+                case 0 :
+                    if (this.object[1].LOOT.RANDOM) {
+                        this.earnGold = Math.round(Math.random() * (this.object[1].LOOT.MAX_GOLD - this.object[1].LOOT.MIN_GOLD) + this.object[1].LOOT.MIN_GOLD);
+                    } else {
+                        this.earnGold = this.object[1].MAX_GOLD;
+                    }
+                    currency.giveCurrencyByID(msg.author.id, this.earnGold);
+                    let objectCaughtMessage = this.pickRandomAttribute(this.object[1].CAUGHT);
+                    return messager.messageToChannel(msg, vsprintf(objectCaughtMessage[1], [msg.author, this.earnGold]), this.spawnTimeOut);
+                // Type 1 = lootbox
+                case 1 :
+                    let _this = this;
+                    let loot = this.pickRandomAttribute(this.object[1].CAUGHT);
+                    this.earnGold = loot[1].GOLD;
+                    switch (loot[0]) {
+                        case "LEGENDARY" :
+                            connection.query('SELECT description FROM loot ORDER BY RAND() LIMIT 1;', function (error, result) {
+                                if (error) logger.warn(error);
+                                messager.messageToChannel(msg, vsprintf(loot[1].MSG, [msg.author, result[0].description, _this.earnGold]), _this.spawnTimeOut);
+                            });
+                            break;
+                        case "NOTHING" :
+                            messager.messageToChannel(msg, vsprintf(loot[1].MSG, [msg.author]), this.spawnTimeOut);
+                            break;
+                        default :
+                            messager.messageToChannel(msg, vsprintf(loot[1].MSG, [msg.author, this.earnGold]), this.spawnTimeOut);
+                    }
+                    return currency.giveCurrencyByID(msg.author.id, this.earnGold);
+                default:
+                    logger.warn(LANG.LOGGER.POROGAME.NO_SUCH_TYPE);
+            }
+        } else {
+            return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+        }
+    }
+
+    // lootbox methods to list, add or remove loot from boxes
+    listLoot(msg) { // check permissions before executing
+        connection.query('SELECT * FROM loot;', function(error,result) {
+            if(error) logger.warn(error);
+            let stm = "```Lootable Items in Database:\n\n";
+            for (let key in result) {
+                if (result.hasOwnProperty(key)) {
+                    stm += "ID: " + result[key].id + " |   Name: " + result[key].name + "    |   Beschreibung: " + result[key].description + "\n";
+                    if (stm.length >= 1900) {
+                        messager.messageToAuthor(msg, stm);
+                        stm = "```";
+                    }
+                }
+            }
+            stm +="```";
+            messager.messageToAuthor(msg, stm);
+        });
+    }
+    addLoot(msg, name, description) {
+        connection.query('INSERT INTO loot(name, description) VALUES("'+name+'", "'+description+'");', function(error) {
+            if(error) logger.warn(error);
+        });
+        return messager.messageToAuthor(msg, LANG.POROGAME.LOOTBOX.LOOT.ADDED);
+    }
+    removeLoot(msg, ID) {
+        connection.query('DELETE FROM loot WHERE id = '+ID+';', function(error) {
+            if(error) logger.warn(error);
+        });
+        return messager.messageToAuthor(msg, LANG.POROGAME.LOOTBOX.LOOT.REMOVED);
+    }
+}
+class Flower {
+    constructor() {
+        this.flowerSpawned = false;
+        this.flowerTimeOut = 0;
+    }
+
+    buyFlower(msg) {
+        connection.query('UPDATE user SET flower = flower + 1 WHERE discordID = ' + msg.author.id + ';', function (error) {
+            if (error) logger.warn(error);
+        });
+    }
+    sellFlower(msg) {
+        connection.query('SELECT flower FROM user WHERE discordID = '+msg.author.id+';', function(error, result) {
+           if (error) logger.warn(error);
+
+           if (!result[0] || result[0].flower <= 0) return messager.messageToChannel(msg, LANG.FLOWER.NO_FLOWER_IN_INVENTORY, 15000);
+           connection.query('UPDATE user SET flower = flower - 1 WHERE discordID = '+msg.author.id+';', function(error) {
+               if(error) logger.warn(error);
+
+               currency.giveCurrencyByID(msg.author.id, 150);
+               return messager.messageToChannel(msg, LANG.STORE.ITEM_SOLD_SUCCESSFULLY, 15000);
+           });
+        });
+    }
+    eatFlower(msg) {
+        connection.query('SELECT flower FROM user WHERE discordID = '+msg.author.id+';', function(error, result) {
+            if (error) logger.warn(error);
+
+            if (!result[0] || result[0].flower <= 0) return messager.messageToChannel(msg, LANG.FLOWER.NO_FLOWER_IN_INVENTORY, 15000);
+            connection.query('UPDATE user SET flower = flower - 1 WHERE discordID = '+msg.author.id+';', function(error) {
+                if(error) logger.warn(error);
+
+                return messager.messageToChannel(msg, vsprintf(LANG.FLOWER.FLOWER_ATE, [msg.author.username,client.emojis.find("name", "sakura")]), 150000);
+            });
+        });
+    }
+    giveFlower(msg, giftedID) {
+        let _this = this, clearID = bot.convertNickToID(giftedID);
+
+        connection.query('SELECT * FROM user WHERE discordID = ' + msg.author.id + ';', function (error, result) {
+            if (error) logger.warn(error);
+
+            if(!result[0] || result[0].flower <= 0) {
+                return _this.messageToChannel(msg, LANG.FLOWER.NO_FLOWER_IN_INVENTORY, 6000);
+            } else {
+                connection.query('UPDATE user SET flower = flower - 1 WHERE discordID = ' + msg.author.id + ';', function (error) {
+                    if (error) logger.warn(error);
+
+                    connection.query('INSERT INTO user(discordID, flower) VALUES('+clearID+', 1) ON DUPLICATE KEY UPDATE flower = flower + 1;', function (error) {
+                        if (error) logger.warn(error);
+
+                        messager.messageToUserWithImage(msg, clearID, vsprintf(LANG.FLOWER.FLOWER_GIFTED_USERMESSAGE, [msg.author.username,client.emojis.find("name", "sakura")]), LANG.FLOWER.FLOWER_IMAGE);
+                        return messager.messageToChannelWithImage(msg, vsprintf(LANG.FLOWER.FLOWER_GIFTED_PUBLIC, [msg.author,giftedID,client.emojis.find("name", "sakura")]), LANG.FLOWER.FLOWER_IMAGE, 30000);
+                    });
+                });
+            }
+        });
+    }
+    plantFlower(msg) {
+        let _this = this;
+
+        if (this.flowerSpawned) {
+            return messager.messageToChannel(msg, LANG.FLOWER.ALREADY_PLANTED, 15000);
+        }
+        connection.query('SELECT * FROM user WHERE discordID = ' + msg.author.id + ';', function (error, result) {
+            if (error) logger.warn(error);
+
+            if (!result[0] || result[0].flower <= 0) {
+                return messager.messageToChannel(msg, LANG.FLOWER.NO_FLOWER_IN_INVENTORY, 6000);
+            } else {
+                connection.query('UPDATE user SET flower = flower - 1 WHERE discordID = ' + msg.author.id + ';', function (error) {
+                    if (error) logger.warn(error);
+                    _this.flowerSpawned = true;
+                    _this.flowerTimeOut = setTimeout(function() { _this.flowerSpawned = false; }, 3600000);
+                    messager.messageToChannelWithImage(msg, vsprintf(LANG.FLOWER.FLOWER_PLANTED, [msg.author.username, client.emojis.find("name", "sakura")]), LANG.FLOWER.FLOWER_IMAGE, 3600000);
+                });
+            }
+        });
+    }
+    pickupFlower(msg) {
+        if (this.flowerSpawned) {
+            clearTimeout(this.flowerTimeOut);
+            this.flowerSpawned = false;
+            logger.info(LANG.MESSAGE.ID);
+            messager.deleteMessageByID(msg, LANG.MESSAGE.ID);
+            messager.messageToChannel(msg, vsprintf(LANG.FLOWER.FLOWER_PICKED_UP, [msg.author, client.emojis.find("name", "sakura")]), 15000);
+
+            connection.query('INSERT INTO user(discordID, flower) VALUES('+msg.author.id+', 1) ON DUPLICATE KEY UPDATE flower = flower + 1;', function (error) {
+                if (error) logger.warn(error);
+
+            });
+        } else {
+            messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+        }
+    }
+}
+class Assignment {
+    addGame(msg,msgContent) {
+        let game = msgContent[1], alias = msgContent[2], role = msgContent[3];
+        msg.guild.createRole({name: role, permissions: ['MENTION_EVERYONE']})
+            .then(role => logger.info('Rolle '+role+' erstellt.'))
+            .catch(logger.warn);
+        connection.query('INSERT INTO games(game,alias,role) VALUES("'+game+'","'+alias+'","'+role+'");', function (error) {
+            if (error) logger.warn(error);
+            return messager.messageToChannel(msg, vsprintf(LANG.GENERAL.SUCCESS,[msg.author, client.emojis.find("name", "poro")]),3000);
+        })
+    }
+    removeGame(msg,msgContent) {
+        let game = msgContent[1];
+        connection.query('SELECT * FROM games WHERE game = "'+game+'";', function (error, result) {
+            if (error) logger.warn(error);
+            if(result) {
+                msg.guild.roles.find("name", result[0].role).delete()
+                    .then(role => logger.info("Rolle "+role+" gelöscht"))
+                    .catch(logger.warn);
+                connection.query('DELETE FROM games WHERE game = "'+game+'";', function (error) {
+                    if (error) logger.warn(error);
+                    return messager.messageToChannel(msg, vsprintf(LANG.GENERAL.SUCCESS,[msg.author, client.emojis.find("name", "poro")]),3000);
+                });
+            } else {
+                return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+            }
+        })
+    }
+    listRoles(msg) {
+        connection.query('SELECT game, alias FROM games;', function(error,result) {
+            if(error) throw error;
+            let stm = "```Erhältliche Rollen via !addRole:\n\n";
+            for (let key in result) {
+                if (result.hasOwnProperty(key)) {
+                    stm += "Spiel: " + result[key].game + " |   Alias: !addRole " + result[key].alias +"\n\n";
+                    if (stm.length >= 1900) {
+                        messager.messageToChannel(msg, stm, 15000);
+                        stm = "```";
+                    }
+                }
+            }
+            stm +="```";
+            messager.messageToChannel(msg, stm, 15000);
+        });
+    }
+    addDiscordRole(msg,msgContent) {
+        connection.query('SELECT * FROM games WHERE alias = "'+msgContent+'";', function (error, result) {
+            if(error) logger.warn(error);
+            result = result[0];
+            if (result) {
+                if (result.alias.toLowerCase() === msgContent.toLowerCase()) {
+                    msg.member.addRole(msg.guild.roles.find("name", result.role)).catch(error => logger.warn(error));
+                    return messager.messageToChannel(msg,vsprintf(LANG.GENERAL.SUCCESS,[msg.author, client.emojis.find("name", "poro")]),3000);
+                }
+            } else {
+                return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+            }
+        });
+    }
+    removeDiscordRole(msg,msgContent) {
+        let that = this;
+        connection.query('SELECT * FROM games WHERE alias = "'+msgContent+'";', function (error, result) {
+            if (error) logger.warn(error);
+            result = result[0];
+            if (result) {
+                if (result.alias.toLowerCase() === msgContent.toLowerCase()) {
+                    msg.member.removeRole(msg.guild.roles.find("name", result.role)).catch(error => logger.warn(error)
+                    );
+                    return that.messageSend(msg, vsprintf(LANG.GENERAL.SUCCESS,[msg.author, client.emojis.find("name", "poro")]),3000);
+                }
+            } else {
+                return messager.messageToChannel(msg, LANG.GENERAL.ERROR, 3000);
+            }
+        });
+    }
+
+}
+
 const bot = new BotData();
+const currency = new Currency();
+const messager = new Messager();
+const poro = new Poro();
+const assignment = new Assignment();
+const store = new Store();
+const flower = new Flower();
+
 let logger = log4js.getLogger('Bot');
 logger.logCommand = function(msg, msgCmd, channel) {
     this.info("["+msg.author.username+"]"+ " User has used Command '" + msgCmd + "' in Channel " + channel);
@@ -389,93 +547,104 @@ client.on("ready", () => {
 });
 
 client.on("message", (message) => {
-    if(message.author.id === Id.USER_BOT) return;
+    if(message.author.id === LANG.PERMISSIONS.KING_PORO) return;
 
-    if (bot.checkValid(message.content, cV.onCommand)) {
-        let msgCmd = message.content.substring(1).split(" ");
+    if (message.content.startsWith("!")) {
+        let msgCmd = [].map.call(message.content.substring(1).split(/\s\s*(?=(?:[^"]|"[^"]*")*$)/g), function(el) { return el.replace(/^"|"$/g, '');});
         logger.logCommand(message, msgCmd, message.channel.id);
-        message.delete().catch(error => logger.warn(error));
-        // Command Usage in Assignment Channel, Listed Commands: addRole, removeRole, help.
+        message.delete(100).catch(error => logger.warn(error));
+
         switch(message.channel.id) {
-            case Channel.CH_ROLE_ASSIGNMENT:
+            case LANG.CHANNEL.ROLE_ASSIGNMENT:
                 switch (msgCmd[0].toLowerCase()) {
 
-                    case Commands.COM_ADD_ROLE.command.toLowerCase():
-                        return bot.addDiscordRole(message, msgCmd[1]);
-
-                    case Commands.COM_REMOVE_ROLE.command.toLowerCase():
-                        return bot.removeDiscordRole(message, msgCmd[1]);
-
+                    case COMMANDS.ADD_ROLE.COMMAND.toLowerCase():
+                        return assignment.addDiscordRole(message, msgCmd[1]);
+                    case COMMANDS.REMOVE_ROLE.COMMAND.toLowerCase():
+                        return assignment.removeDiscordRole(message, msgCmd[1]);
+                    case COMMANDS.ADD_GAME.COMMAND.toLowerCase():
+                        return assignment.addGame(message, msgCmd);
+                    case COMMANDS.REMOVE_GAME.COMMAND.toLowerCase():
+                        return assignment.removeGame(message, msgCmd);
+                    case COMMANDS.LIST_GAMES.COMMAND.toLowerCase():
+                        return assignment.listRoles(message);
                     default:
-                        return bot.messageSend(mS.errUser, message);
+                        return messager.messageToChannel(message, LANG.GENERAL.ERROR, 3000);
                 }
-            case Channel.CH_DEVELOPMENT:
-            case Channel.CH_LOBBY:
+            case LANG.CHANNEL.DEVELOPMENT:
+            case LANG.CHANNEL.LOBBY:
+            case LANG.CHANNEL.ANIME_TALK:
+            case LANG.CHANNEL.MEME_TALK:
                 switch (msgCmd[0].toLowerCase()) {
 
-                    case Commands.COM_LIST_LOOT.command.toLowerCase():
-                        return bot.listLoot(message);
+                    case COMMANDS.HELP.COMMAND.toLowerCase():
+                        return bot.help(message, msgCmd[1]);
 
-                    case Commands.COM_HELP.command.toLowerCase():
-                        return bot.help(message, Commands.COM_HELP.command);
+                    // POROGAME
+                    case COMMANDS.SPAWN_PORO.COMMAND.toLowerCase():
+                        return poro.spawnCommand(message);
+                    case COMMANDS.SPAWN_STOP.COMMAND.toLowerCase():
+                        return poro.spawnStop(message);
+                    case COMMANDS.CATCH.COMMAND.toLowerCase():
+                        return poro.catchObject(message, msgCmd[1], COMMANDS.CATCH.COMMAND);
+                    case COMMANDS.OPEN.COMMAND.toLowerCase():
+                        return poro.catchObject(message, msgCmd[1], COMMANDS.OPEN.COMMAND);
 
-                    case Commands.COM_AHELP.command.toLowerCase():
-                        return bot.help(message, Commands.COM_AHELP.command);
+                    // POROGAME -- LOOTBOX
+                    case COMMANDS.LIST_LOOT.COMMAND.toLowerCase():
+                        return poro.listLoot(message);
+                    case COMMANDS.ADD_LOOT.COMMAND.toLowerCase():
+                        return poro.addLoot(message, msgCmd[1], msgCmd[2]);
+                    case COMMANDS.REMOVE_LOOT.COMMAND.toLowerCase():
+                        return poro.removeLoot(message, msgCmd[1]);
 
-                    case Commands.COM_SPAWN_PORO.command.toLowerCase():
-                        return bot.spawnPoro(message);
+                    // CURRENCY
+                    case COMMANDS.SHOW_GOLD.COMMAND.toLowerCase():
+                        return currency.showCurrency(message, msgCmd[1]);
+                    case COMMANDS.SHOW_RANK.COMMAND.toLowerCase():
+                        return currency.showCurrencyRanking(message);
+                    case COMMANDS.GIVE_GOLD.COMMAND.toLowerCase():
+                        if (!(message.guild.members.has(bot.convertNickToID(msgCmd[1])) && Number.isInteger(parseInt(msgCmd[2])))) return messager.messageToAuthor(message, LANG.CURRENCY.CURRENCY_INPUT_IS_INVALID);
+                        if(!bot.permissionChecker(message, LANG.PERMISSIONS.ADMIN)) return messager.messageToAuthor(message, LANG.CURRENCY.CURRENCY_NO_PERMISSIONS);
+                        currency.giveCurrencyByID(bot.convertNickToID(msgCmd[1]), msgCmd[2]);
+                        return messager.messageToAuthor(message, vsprintf(LANG.CURRENCY.CURRENCY_GIVEN, [msgCmd[1],msgCmd[2]]));
+                    case COMMANDS.TAKE_GOLD.COMMAND.toLowerCase():
+                        if (!(message.guild.members.has(bot.convertNickToID(msgCmd[1])) && Number.isInteger(parseInt(msgCmd[2])))) return messager.messageToAuthor(message, LANG.CURRENCY.CURRENCY_INPUT_IS_INVALID);
+                        if(!bot.permissionChecker(message, LANG.PERMISSIONS.ADMIN)) return messager.messageToAuthor(message, LANG.CURRENCY.CURRENCY_NO_PERMISSIONS);
+                        currency.takeCurrencyByID(bot.convertNickToID(msgCmd[1]), msgCmd[2]);
+                        return messager.messageToAuthor(message, vsprintf(LANG.CURRENCY.CURRENCY_TAKEN, [msgCmd[1],msgCmd[2]]));
 
-                    case Commands.COM_SPAWN_STOP.command:
-                        return bot.spawnStop(message);
-
-                    case Commands.COM_CATCH.command:
-                        return bot.catchPoro(message, msgCmd[1], "catch");
-
-                    case Commands.COM_OPEN.command:
-                        return bot.catchPoro(message, msgCmd[1], "open");
-
-                    case Commands.COM_SHOW_GOLD.command:
-                        return bot.showGold(message);
-
-                    case Commands.COM_SHOW_RANK.command:
-                        return bot.showRanking(message);
-
-                    case Commands.COM_MEMEGEN.command:
-                        return bot.memeGen(message, message.content.substring(1));
-
-                    case Commands.COM_MEMEGEN_HELP.command:
-                        return bot.memeHelp(message);
+                    // FLOWER
+                    case COMMANDS.GIVE_FLOWER.COMMAND.toLowerCase():
+                        if(!(message.guild.members.has(bot.convertNickToID(msgCmd[1])))) return message.messageToChannel(message, LANG.GENERAL.ERROR, 3000);
+                        return flower.giveFlower(message, msgCmd[1]);
+                    case COMMANDS.PICKUP_FLOWER.COMMAND.toLowerCase():
+                        return flower.pickupFlower(message);
+                    case COMMANDS.PLANT_FLOWER.COMMAND.toLowerCase():
+                        return flower.plantFlower(message);
+                    case COMMANDS.EAT_FLOWER.COMMAND.toLowerCase():
+                        return flower.eatFlower(message);
 
                     default:
-                        return bot.messageSend(mS.errUser, message);
+                        return messager.messageToChannel(message, LANG.GENERAL.ERROR, 3000);
                 }
-            case Channel.CH_MEMETALK:
+
+            case LANG.CHANNEL.SHOP:
                 switch (msgCmd[0]) {
-
-                    case Commands.COM_MEMEGEN.command:
-                        return bot.memeGen(message, message.content.substring(1));
-
-                    case Commands.COM_MEMEGEN_HELP.command:
-                        return bot.memeHelp(message);
-
-                    default:
-                        return bot.messageSend(mS.errUser, message);
-
-                }
-            case Channel.CH_SHOP:
-                switch (msgCmd[0]) {
-                    case Commands.COM_SHOW_STORE.command:
-                        return bot.storeList(message);
-
-                    case Commands.COM_BUY_ITEM.command:
-                        return bot.buyItem(message, msgCmd[1]);
+                    case COMMANDS.SHOW_GOLD.COMMAND.toLowerCase():
+                        return currency.showCurrency(message, msgCmd[1]);
+                    case COMMANDS.SHOW_STORE.COMMAND.toLowerCase():
+                        return store.storeList(message);
+                    case COMMANDS.BUY_ITEM.COMMAND.toLowerCase():
+                        return store.buyItem(message, msgCmd[1]);
+                    case COMMANDS.SELL_ITEM.COMMAND.toLowerCase():
+                        return store.sellItem(message, msgCmd[1]);
 
                     default:
-                        return bot.messageSend(mS.errUser, message);
+                        return messager.messageToChannel(message, LANG.GENERAL.ERROR, 3000);
                 }
-
         }
-    } else if (message.channel.id === Channel.CH_ROLE_ASSIGNMENT || message.channel.id === Channel.CH_SHOP) {
+    } else if (message.channel.id === LANG.CHANNEL.ROLE_ASSIGNMENT || message.channel.id === LANG.CHANNEL.SHOP) {
         message.delete().catch(error => logger.warn(error));
     }
 });

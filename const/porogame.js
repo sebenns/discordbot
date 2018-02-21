@@ -1,84 +1,102 @@
+const COMMANDS = require("./commands.js");
+
 module.exports = {
-    "Settings" : {
-        "TimeOut": 30000, // 30 Seconds TimeOut for PoroSpawn Message
-        "MaxIntVall": 600000, // Max Interval for Spawning Time
-        "MinIntVall": 300000, // Min Interval for Spawning Time
-        "spawning" : {
-            "poro" : false, // Poro is not spawned at the beginning, default = false
-            "lootbox" : false,
-        },
-        "spawnedType" : "",
-        "looper" : 0,
-        "rmCatchNumb" : 0 // Catch Numb will be generated and saved in this obj. const.
+    SETTINGS : {
+        TIMEOUT : 30000, // 30 Seconds TimeOut for PoroSpawn Message
+        MAX_SPAWN_INTERVAL : 200000, // Max Interval for Spawning Time
+        MIN_SPAWN_INTERVAL : 100000, // Min Interval for Spawning Time
     },
-    "Lang" : {
-        "bank_notEnough" : "Du hast zurzeit leider kein Gold. Du solltest Dir lieber etwas dazu verdienen! Nyo nyo nya nyo.",
-        "bank_status" : "Du hast zurzeit `%s Gold`. Wenn Du nach neuen Accessoires suchst, versuche es mal im Poro-Shop! Nyo nya nya!",
-        "buy_success" : "Dein gekauftes Item wurde Dir erfolgreich gutgeschrieben! Viel Spaß damit :) Non non nan nan!",
-        "buy_notExist" : "Das von dir ausgesuchte Item existiert leider garnicht! Hast du Dich etwa vertippt, nya nya nyo?",
-        "buy_notEnough" : "Du hast leider nicht genug Gold. Versuche es ein anderes Mal, du Gauner! NON NON NAN NON NANANAN NON "
-    },
-    "POROS": {  // different Types of Poros. Maybe you wanna add some new one?
-        "PORO": {
-            "appear" : "Ein wildes Poro ist erschienen!",
-            "catch" : "Benutze `!%s %s` um das wilde Poro einzufangen!",
-            "type" : "normal",
-            "image" : "http://riverflowsinyou.de/scr/187d0fd46e07644bbcc52d1d08e0fba4.png",
-            "caught" : "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für **%s Gold** an einen kuriosen muskolösen bärtigen Mann verkauft."
-        },
-        "TEEMORO" : {
-            "appear" : "Ein Teemoro kommt aus dem Jungle gerannt!",
-            "catch" : "Benutze `!%s %s` um den Wicht zu fangen und zu zerstampfen!",
-            "type" : "normal",
-            "image" : "http://riverflowsinyou.de/scr/teemoro.png",
-            "caught" : "%s hat das Teemoro eingefangen und auf dem nächsten Scheiterhaufen zerstampft. Übrig geblieben sind **%s Gold** und ein Pilz."
-        },
-        "LOOTBOX" : {
-            "appear" : "Eine Lootbox ist vom Himmel gefallen!?!",
-            "catch" : "Benutze `!%s %s` um die Lootbox zu öffnen und dein Glück herauszufordern!",
-            "type" : "lootbox",
-            "image" : "http://riverflowsinyou.de/scr/8.png",
-            "caught_1" : "%s hat die Lootbox geöffnet und erschaudert vor dem legendären Anblick eines **__%s__** Skins. Leider war es ein Duplikat. Schade aber auch :(. ( + **%s Gold** ).",
-            "caught_2" : "%s hat die Lootbox gegen die Wand geschmissen. Aus der Box fallen lauter wertlose Gegenstände. Das war wohl leider nix. Verkauft bringen sie trotzdem was! ( + **%s Gold** ).",
-            "caught_3" : "Eines Tages bekam %s - nach etlichen Versuchen mit dem Zahnstocher.. - die Lootbox schließlich auf. Drinnen war aber leider nichts. Vielleicht nächstes Mal?",
-            "loot" : 0,
-            "the_main" : {
-                genji : "GENJI THE MAIN",
-                tracer : "TRACER THE WILD",
-                yasuo : "YASUO THE RET.. I MEAN.. GOD",
-                maudado : "MAUDA.. wrong game.. sorry",
-                dasgramma : "SUPERHACKA",
-                yusako : "NAMI MAIN INC.",
-                mercy : "GODLIKE MERCY",
-                ana : "WHO THE FUCK IS ANA?",
-                lucio : "LET'S BLOB THE SHIT OUT OF.. LUCIO",
-                symmetra : "RIGHT CLICK SYMMETRA",
-                pharah : "OP AS FUCK PHARAH",
-                widow : "ONE SHOT ONE KILL WIDOWMAKER"
+    OBJECTS: {
+        // Type 0 = normal, 1 = lootbox || Appear = Appearmsg, || Catch = How To Catch Msg, || Image || Command_To_Use || Caught = Msgs if caught || Loot = If random = false, Max Gold = Default
+        PORO: {
+            TYPE : 0,
+            APPEAR : "Ein wildes Poro ist erschienen!",
+            CATCH : "Benutze `!%s %s` um das wilde Poro einzufangen!",
+            IMAGE : "http://riverflowsinyou.de/scr/187d0fd46e07644bbcc52d1d08e0fba4.png",
+            COMMAND_TO_USE : COMMANDS.CATCH.COMMAND,
+            CAUGHT : {
+                1: "%s hat das Poro eingefangen und auf dem nächsten **White-Poro-Market** für **%s Gold** an einen kuriosen muskolösen bärtigen Mann verkauft.",
+                2: "Das Poro ist %s leider entwischt und hinterlässt etwas Poro-Kot. Auf dem nächsten **White-Poro-Market** verkaufst du den Poro-Kot für **%s Gold**." +
+                "Man kann ja nicht alles haben ¯|_(ツ)_/¯",
+                3: "Schwiii, Schwaaaa, Schwuuupps. Das Poro bewirft %s mit **%s Gold**. Bloß nicht in Ohnmacht fallen!"
+            },
+            LOOT : {
+                RANDOM : true,
+                MAX_GOLD : 100,
+                MIN_GOLD : 50,
             }
+        },
+        TEEMORO : {
+            TYPE : 0,
+            APPEAR : "Ein Teemoro kommt aus dem Jungle gerannt!",
+            CATCH : "Benutze `!%s %s` um den Wicht zu fangen und zu zerstampfen!",
+            IMAGE : "http://riverflowsinyou.de/scr/teemoro.png",
+            COMMAND_TO_USE : COMMANDS.CATCH.COMMAND,
+            CAUGHT : {
+                1: "%s hat das Teemoro eingefangen und auf dem nächsten Scheiterhaufen zerstampft. Übrig geblieben sind **%s Gold** und ein Pilz.",
+                2: "Das Teemoro hat Feuer gefangen und verbrennt bei lebendigem Leibe. Übrig geblieben ist etwas Gold. %s hebt **%s Gold** auf und besucht den nächstgelegenen #poro-shop.",
+                3: "Laute Schreie sind aus der tiefen Verdammnis zu hören. Wer wird da wohl gequält? %s tritt aus der Dunkelheit mit **%s Gold** heraus."
+            },
+            LOOT : {
+                RANDOM : true,
+                MAX_GOLD : 100,
+                MIN_GOLD : 50,
+            }
+        },
+        URF : {
+            TYPE : 0,
+            APPEAR : "Ein wildes Urf ist erschienen! Es scheint sich gerade mit Freunden zu unterhalten...?!",
+            CATCH : "Benutze `!%s %s` um das wilde Urf zu fangen und es auf dem nächsten **URF-MARKET** zu verkaufen!",
+            IMAGE : "http://riverflowsinyou.de/scr/urf.png",
+            COMMAND_TO_USE : COMMANDS.CATCH.COMMAND,
+            CAUGHT : {
+                1: "**OH MEIN GOTT!** %s hat versucht das Urf zu fangen, ist gestolpert und in den nächstgelegenen Busch gerollt. HAHA! Wenigstens **%s Gold** gefunden! :)",
+                2: "Das wilde Urf bewirft %s mit einem Pfannenwender, welcher nun für **%s Gold** verkauft wird. Urf-Pfannenwender sind halt etwas Besonderes ヽ༼☉ɷ⊙༽ﾉ",
+                3: "(つಥ▽ಥ)つ⊂(ಥヮಥ⊂) FREUNDE FÜR IMMER (つಥ▽ಥ)つ⊂(ಥヮಥ⊂) Das wilde Urf schenkt %s genau **%s Gold**. (つಥ▽ಥ)つ⊂(ಥヮಥ⊂) FREUNDE (つಥ▽ಥ)つ⊂(ಥヮಥ⊂)"
+            },
+            LOOT : {
+                RANDOM : true,
+                MAX_GOLD : 300,
+                MIN_GOLD : 100,
+            }
+        },
+        THINKING_BARD : {
+            TYPE : 0,
+            APPEAR : "Ein Hyper-Feeder ist aufgetaucht. Fange ihn, bevor das Spiel verloren ist!",
+            CATCH : "Benutze `!%s %s` um den verrückt gewordenen Feeder aufzuhalten und deine Runde noch zu gewinnen!",
+            IMAGE : "http://riverflowsinyou.de/scr/bard.png",
+            COMMAND_TO_USE : COMMANDS.CATCH.COMMAND,
+            CAUGHT : {
+              1: "%s hat den Hyper-Feeder gefangen und ihn zurück in die Base verfrachtet. Das Spiel scheint fast gewonnen zu sein! ( + **%s Gold** )",
+              2: "Man kann leider nicht jedes Spiel gewinnen. %s hat es zwar nicht geschaffen den Feeder aufzuhalten, aber es gibt trotzdem etwas Gold! ( + **%s Gold** )",
+              3: "%s hat sich dafür entschieden mit dem Feeder zu spielen. Nun trollen beide und das Spiel scheint verloren zu sein. Naja.. Was solls! ヽ༼☉ɷ⊙༽ﾉ ( + **%s Gold** )"
+            },
+            LOOT : {
+                RANDOM : true,
+                MAX_GOLD : 200,
+                MIN_GOLD : 100,
+            }
+        },
+        LOOTBOX : {
+            TYPE : 1,
+            APPEAR : "Eine Lootbox ist vom Himmel gefallen!?!",
+            CATCH : "Benutze `!%s %s` um die Lootbox zu öffnen und dein Glück herauszufordern!",
+            IMAGE : "http://riverflowsinyou.de/scr/8.png",
+            COMMAND_TO_USE : COMMANDS.OPEN.COMMAND,
+            CAUGHT : {
+                LEGENDARY : {
+                    MSG : "%s hat die Lootbox geöffnet und erschaudert vor dem legendären Anblick eines **__%s__** Skins. Leider war es ein Duplikat. Schade aber auch :(. ( + **%s Gold** ).",
+                    GOLD : 250,
+                },
+                CRAP : {
+                    MSG: "%s hat die Lootbox gegen die Wand geschmissen. Aus der Box fallen lauter wertlose Gegenstände. Das war wohl leider nix. Verkauft bringen sie trotzdem was! ( + **%s Gold** ).",
+                    GOLD: 100,
+                },
+                NOTHING : {
+                    MSG: "Eines Tages bekam %s - nach etlichen Versuchen mit dem Zahnstocher.. - die Lootbox schließlich auf. Drinnen war aber leider nichts. Vielleicht nächstes Mal?",
+                    GOLD: 0,
+                }
+            },
         }
     },
-    "STORE": {  // Items for sell. Maybe some commands will be added.
-        "ITEM_UNICORN": {
-            "name" : "Unicorn-of-Love",
-            "item" : "Unicorn of Love",
-            "description" : "Ein Rang der nur vor Liebe strotzt. Are you the Unicorn of Love?",
-            "price" : 5000,
-            "type" : "Rank"
-        },
-        "ITEM_CAT" : {
-            "name" : "Flying-Cat",
-            "item" : "Flying Cat",
-            "description" : "Flying Cats here, Flying Cats there, Flying Cats everywhere!",
-            "price" : 2500,
-            "type" : "Rank"
-        },
-        "ITEM_FOOD" : {
-            "name" : "Katzenfutter",
-            "item" : "Katzenfutter",
-            "description" : "Hast Du dich schon immer mit Katzenfutter identifizieren können?",
-            "price" : 500,
-            "type" : "Rank"
-        }
-    }
 };
